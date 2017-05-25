@@ -1,0 +1,19 @@
+{
+  "name": "gitfiledownloader",
+  "version": "1.0.0",
+  "description": "A downloader for gitlab files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node",
+    "crawl"
+  ],
+  "author": "cnzsb",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "0.16.1",
+    "cheerio": "0.22.0"
+  }
+}

@@ -1,0 +1,13 @@
+# Logs
+logs
+*.log
+
+# Dependency directory
+node_modules
+
+# Debug log from npm
+npm-debug.log
+
+# others
+.idea
+.DS_Store
