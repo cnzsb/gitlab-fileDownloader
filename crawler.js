@@ -3,6 +3,7 @@ const cheerio = require('cheerio')
 const fs = require('fs')
 const qs = require('querystring')
 const URL = require('url')
+const path = require('path')
 
 const $http = axios.create({
   withCredentials: true,
@@ -17,6 +18,12 @@ const $http = axios.create({
     return status >= 200 && status < 300 || status === 302  // gitlab 登录 302 重定向
   },
 })
+
+function mkdirSync(filepath) {
+  if (fs.existsSync(filepath)) return
+  mkdirSync(path.dirname(filepath))
+  fs.mkdirSync(filepath)
+}
 
 class Crawler {
   constructor(opts) {
@@ -123,9 +130,9 @@ class Crawler {
   _download(dicts) {
     const count = dicts.length
     let index = 0
-    const path = this.opts.path
+    const targetPath = this.opts.path
     const headers = { Cookie: this.opts.cookie.value }
-    if (!fs.existsSync(path)) fs.mkdirSync(path)
+    if (!fs.existsSync(targetPath)) mkdirSync(targetPath)
     return (async function downloadFile(source) {
       index++
       console.log(`--- ${index} / ${count} : ${source.name} ---\n`)
@@ -133,10 +140,10 @@ class Crawler {
         responseType: 'stream',
         headers,
       })
-      data.pipe(fs.createWriteStream(`${path}/${source.name}`))
+      data.pipe(fs.createWriteStream(`${targetPath}/${source.name}`))
       console.log(`--- ${index} / ${count} 下载完毕 ---\n`)
 
-      if (!dicts.length) return console.log(`==============================\n所有文件下载至路径 ${path} 完毕，请打开文件夹查看\n`)
+      if (!dicts.length) return console.log(`==============================\n所有文件下载至路径 ${targetPath} 完毕，请打开文件夹查看\n`)
       return downloadFile(dicts.shift())
     })(dicts.shift())
   }
