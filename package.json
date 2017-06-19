@@ -8,7 +8,9 @@
   },
   "keywords": [
     "node",
-    "crawl"
+    "crawler",
+    "axios",
+    "cheerio"
   ],
   "author": "cnzsb",
   "license": "MIT",
