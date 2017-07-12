@@ -3,7 +3,9 @@ const Crawler = require('./crawler')
 const crawler = new Crawler({
   url: '',
   username: '',
-  password: ''
+  password: '',
+  path: '',
+  deep: true
 })
 
 crawler.run()

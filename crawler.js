@@ -6,19 +6,21 @@ const URL = require('url')
 const path = require('path')
 
 const $http = axios.create({
-  withCredentials: true,
-  // maxRedirects: 0,
+  withCredentials: true,   // 获取 Cookie
+  // maxRedirects: 0,      // 不重定向
   headers: {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6,zh-TW;q=0.4',
   },
-  validateStatus: function (status) {
-    return status >= 200 && status < 300 || status === 302  // gitlab 登录 302 重定向
-  },
+  validateStatus: status => (status >= 200 && status < 300 || status === 302)  // gitlab 登录 302 重定向
 })
 
+/**
+ * 递归创建文件夹
+ * @param filepath {String}
+ */
 function mkdirSync(filepath) {
   if (fs.existsSync(filepath)) return
   mkdirSync(path.dirname(filepath))
@@ -31,43 +33,54 @@ class Crawler {
       url: '',
       username: '',
       password: '',
-      deep: false,
-      path: './downloads',
+      deep: false,      // 是否下载文件夹内容
+      path: './downloads',  // 下载路径
       cookie: {
         value: '',
         expires: 0,
       },
     }, opts)
+    if (!this.opts.path.endsWith('/')) this.opts.path += '/'
 
     const urlObj = URL.parse(this.opts.url)
     this.opts.urlOrigin = `${urlObj.protocol}//${urlObj.host}`
   }
 
-  run() {
-    this.getDicts()
+  async run() {
+    console.log('开始解析目录...')
+    const dicts = await this.getDict()
+    if (!dicts.length) return console.log('没有可下载资源')
+    console.log(`共找到 ${dicts.length} 个文件，开始下载...\n==============================\n`)
+    await this._download(dicts)
   }
 
-  async getDicts() {
+  async getDict(urlTarget = this.opts.url, dirname = '') {
     try {
       if (!this.opts.cookie.value || (this.opts.cookie.expires <= Date.now())) await this.login()
-      console.log('已找到目标网址，正在解析文件目录...\n')
-      const { data } = await $http.get(this.opts.url, { headers: { Cookie: this.opts.cookie.value } })
+      const { data } = await $http.get(urlTarget, { headers: { Cookie: this.opts.cookie.value } })
       const $ = cheerio.load(data)
       if ($('[content="Sign in"]').length) {
         this.opts.cookie.value = ''
-        return this.getDicts()
+        return this.getDict()
       }
 
+      const $files = $('.tree-table .tree-item .tree-item-file-name a')
       const dicts = []
-      $('.tree-table .tree-item .tree-item-file-name a').each((index, item) => {
-        const name = $(item).attr('title')
-        const url = `${this.opts.urlOrigin}${$(item).attr('href').replace('/blob/', '/raw/')}`
-        if (!name || !url.includes('/raw/')) return
-        dicts.push({ name, url })
-      })
-      if (!dicts.length) throw new Error('没有可下载资源')
-      console.log(`共找到 ${dicts.length} 个文件，开始下载...\n==============================\n`)
-      this._download(dicts)
+      for (let i = 0; i < $files.length; i++) {
+        const $file = $files.eq(i)
+        const name = $file.attr('title')
+        const url = `${this.opts.urlOrigin}${$file.attr('href').replace('/blob/', '/raw/')}`
+        // 根目录 '..' 没有 name
+        if (!name) continue
+        if (!url.includes('/raw/')) {
+          // 同步使结果可控
+          if (this.opts.deep) dicts.push(...await this.getDict(url, `${dirname}${name}/`))
+          continue
+        }
+
+        dicts.push({ name, url, dirname })
+      }
+      return Promise.resolve(dicts)
     } catch (e) {
       console.error('Error Getting Dictionaries: ', e)
     }
@@ -128,22 +141,23 @@ class Crawler {
   }
 
   _download(dicts) {
+    const root = this.opts.path
     const count = dicts.length
     let index = 0
-    const targetPath = this.opts.path
     const headers = { Cookie: this.opts.cookie.value }
-    if (!fs.existsSync(targetPath)) mkdirSync(targetPath)
     return (async function downloadFile(source) {
       index++
       console.log(`--- ${index} / ${count} : ${source.name} ---\n`)
+      const dirname = `${root}${source.dirname}`
+      if (!fs.existsSync(dirname)) mkdirSync(dirname)
+
       const { data } = await $http.get(source.url, {
         responseType: 'stream',
         headers,
       })
-      data.pipe(fs.createWriteStream(`${targetPath}/${source.name}`))
-      console.log(`--- ${index} / ${count} 下载完毕 ---\n`)
+      data.pipe(fs.createWriteStream(`${dirname}/${source.name}`))
 
-      if (!dicts.length) return console.log(`==============================\n所有文件下载至路径 ${targetPath} 完毕，请打开文件夹查看\n`)
+      if (!dicts.length) return console.log(`==============================\n所有文件下载至路径 ${root} 完毕，请打开文件夹查看\n`)
       return downloadFile(dicts.shift())
     })(dicts.shift())
   }
