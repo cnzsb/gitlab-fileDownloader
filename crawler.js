@@ -4,6 +4,7 @@ const fs = require('fs')
 const qs = require('querystring')
 const URL = require('url')
 const path = require('path')
+const ProgressBar = require('./progressBar')
 
 const $http = axios.create({
   withCredentials: true,   // 获取 Cookie
@@ -143,11 +144,12 @@ class Crawler {
   _download(dicts) {
     const root = this.opts.path
     const count = dicts.length
+    const progressBar = new ProgressBar({ description: '下载进度', amount: count })
     let index = 0
     const headers = { Cookie: this.opts.cookie.value }
     return (async function downloadFile(source) {
       index++
-      console.log(`--- ${index} / ${count} : ${source.name} ---\n`)
+      progressBar.log(index, source.name)
       const dirname = `${root}${source.dirname}`
       if (!fs.existsSync(dirname)) mkdirSync(dirname)
 
