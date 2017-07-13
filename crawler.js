@@ -4,6 +4,7 @@ const fs = require('fs')
 const qs = require('querystring')
 const URL = require('url')
 const path = require('path')
+const stdout = require('single-line-log').stdout
 const ProgressBar = require('./progressBar')
 
 const $http = axios.create({
@@ -34,7 +35,7 @@ class Crawler {
       url: '',
       username: '',
       password: '',
-      deep: false,      // 是否下载文件夹内容
+      deep: true,      // 是否下载文件夹内容
       path: './downloads',  // 下载路径
       cookie: {
         value: '',
@@ -48,11 +49,10 @@ class Crawler {
   }
 
   async run() {
+    this._startTime = Date.now()
     console.log('开始解析目录...')
     const dicts = await this.getDict()
-    if (!dicts.length) return console.log('没有可下载资源')
-    console.log(`共找到 ${dicts.length} 个文件，开始下载...\n==============================\n`)
-    await this._download(dicts)
+    this._download(dicts)
   }
 
   async getDict(urlTarget = this.opts.url, dirname = '') {
@@ -80,7 +80,9 @@ class Crawler {
         }
 
         dicts.push({ name, url, dirname })
+        stdout(`${dirname}${name}`)
       }
+
       return Promise.resolve(dicts)
     } catch (e) {
       console.error('Error Getting Dictionaries: ', e)
@@ -142,6 +144,13 @@ class Crawler {
   }
 
   _download(dicts) {
+    const startTime = this._startTime
+    const startDownTime = Date.now()
+    stdout(`解析目录共耗时${startDownTime - startTime} ms`)
+    if (!dicts.length) return console.log('\n\n没有可下载资源')
+    console.log(`\n\n共找到 ${dicts.length} 个文件，开始下载...`)
+    console.log('==============================\n')
+
     const root = this.opts.path
     const count = dicts.length
     const progressBar = new ProgressBar({ description: '下载进度', amount: count })
@@ -159,7 +168,13 @@ class Crawler {
       })
       data.pipe(fs.createWriteStream(`${dirname}/${source.name}`))
 
-      if (!dicts.length) return console.log(`==============================\n所有文件下载至路径 ${root} 完毕，请打开文件夹查看\n`)
+      if (!dicts.length) {
+        const endTime = Date.now()
+        console.log('\n\n==============================')
+        console.log(`所有文件下载至路径 ${root} 完毕，请打开文件夹查看\n`)
+        console.log(`本次任务总耗时${endTime - startTime} ms，其中下载耗时${endTime - startDownTime} ms`)
+        return
+      }
       return downloadFile(dicts.shift())
     })(dicts.shift())
   }

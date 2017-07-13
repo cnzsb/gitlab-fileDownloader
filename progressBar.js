@@ -19,7 +19,7 @@ class ProgressBar {
     const bar = '█'.repeat(filled) + '░'.repeat(width - filled)
     const desp = description ? `${description}: ` : ''
     const percent = `${(filledPercent * 100).toFixed(2)}% (${count}/${amount})`
-    log(`${desp}${bar} ${percent}${msg ? ` ${msg}`: ''}\n\n`)
+    log(`${desp}${bar} ${percent}${msg ? ` ${msg}`: ''}`)
   }
 }
 
